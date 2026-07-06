@@ -1,9 +1,6 @@
 name: Update Sales Data
 
 on:
-  schedule:
-    # UTC 기준. 10분마다 실행 (KST 기준으로도 10분마다)
-    - cron: "*/10 * * * *"
   workflow_dispatch: {}   # 수동 실행 버튼도 사용 가능
 
 permissions:
