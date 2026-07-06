@@ -1,3 +1,10 @@
 {
-  "records": []
+  "records": [
+    {
+      "timestamp": "2026-07-06T16:00:06.647820+09:00",
+      "sales_value": 0,
+      "stock_value": 0,
+      "options": []
+    }
+  ]
 }
