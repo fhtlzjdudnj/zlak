@@ -191,19 +191,32 @@ function render(records) {
         backgroundColor: 'rgba(91,140,255,0.15)',
         tension: 0.25,
         fill: true,
-        pointRadius: isMobile() ? 0 : 2,
+        pointRadius: 2,
+        pointHitRadius: isMobile() ? 20 : 8,
         borderWidth: isMobile() ? 1.5 : 2,
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
       plugins: {
         legend: {
           labels: {
             color: '#e8eaed',
             font: { size: isMobile() ? 11 : 12 },
             boxWidth: isMobile() ? 12 : 40,
+          }
+        },
+        tooltip: {
+          enabled: true,
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: (item) => '판매량: ' + item.parsed.y,
           }
         }
       },
