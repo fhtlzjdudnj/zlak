@@ -5,6 +5,27 @@
       "sales_value": 0,
       "stock_value": 0,
       "options": []
+    },
+    {
+      "timestamp": "2026-07-06T16:10:19.743216+09:00",
+      "sales_value": 1077,
+      "stock_value": 19542,
+      "options": [
+        {
+          "optionNo": 514748023,
+          "label": "상품",
+          "value": "일상  ver.세트",
+          "saleCnt": 430,
+          "stockCnt": 9805
+        },
+        {
+          "optionNo": 514748024,
+          "label": "상품",
+          "value": "최애  ver.세트",
+          "saleCnt": 647,
+          "stockCnt": 9737
+        }
+      ]
     }
   ]
 }
