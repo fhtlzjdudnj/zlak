@@ -21,6 +21,9 @@ import requests
 PRODUCT_ID = os.environ.get("PRODUCT_ID", "133850457")
 API_URL = f"https://shop-api.e-ncp.com/products/{PRODUCT_ID}/options"
 
+# 상품 기본 판매가 (원). 옵션의 addPrice가 이 위에 추가로 더해진다.
+BASE_PRICE_KRW = 295000
+
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -49,12 +52,6 @@ def fetch_raw():
 
 
 def find_options_list(node):
-    """
-    응답이 [ {...saleCnt...}, ... ] 형태로 바로 오지 않고
-    { "data": [...] } 나 { "result": { "list": [...] } } 처럼
-    감싸져 있을 수도 있어서, saleCnt 키를 가진 딕셔너리들의 리스트를
-    어디에 있든 재귀적으로 찾아낸다.
-    """
     if isinstance(node, list):
         if node and isinstance(node[0], dict) and "saleCnt" in node[0]:
             return node
@@ -76,20 +73,27 @@ def extract_sales(raw):
     breakdown = []
     total_sale = 0
     total_stock = 0
+    total_amount = 0
     for opt in options:
         sale_cnt = opt.get("saleCnt", 0) or 0
         stock_cnt = opt.get("stockCnt", 0) or 0
+        add_price = opt.get("addPrice", 0) or 0
+        price = BASE_PRICE_KRW + add_price
+        amount = sale_cnt * price
         breakdown.append({
             "optionNo": opt.get("optionNo"),
             "label": opt.get("label"),
             "value": opt.get("value"),
             "saleCnt": sale_cnt,
             "stockCnt": stock_cnt,
+            "price": price,
+            "amount": amount,
         })
         total_sale += sale_cnt
         total_stock += stock_cnt
+        total_amount += amount
 
-    return total_sale, total_stock, breakdown
+    return total_sale, total_stock, total_amount, breakdown
 
 
 def load_history():
@@ -120,13 +124,14 @@ def main():
         save_history(history)
         sys.exit(1)
 
-    total_sale, total_stock, breakdown = extract_sales(raw)
+    total_sale, total_stock, total_amount, breakdown = extract_sales(raw)
 
     history = load_history()
     record = {
         "timestamp": now,
         "sales_value": total_sale,
         "stock_value": total_stock,
+        "amount_value": total_amount,
         "options": breakdown,
     }
 
@@ -137,7 +142,7 @@ def main():
 
     save_history(history)
 
-    print(f"[OK] {now} 기록 완료. 총 판매량={total_sale}, 총 재고={total_stock}")
+    print(f"[OK] {now} 기록 완료. 총 판매량={total_sale}, 총 판매금액={total_amount}원")
 
 
 if __name__ == "__main__":
