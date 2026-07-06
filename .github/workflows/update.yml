@@ -1,0 +1,40 @@
+name: Update Sales Data
+
+on:
+  schedule:
+    # UTC 기준. 10분마다 실행 (KST 기준으로도 10분마다)
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}   # 수동 실행 버튼도 사용 가능
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch sales data
+        run: python scripts/fetch_sales.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/history.json
+          if git diff --cached --quiet; then
+            echo "변경 없음, 커밋 스킵"
+          else
+            git commit -m "chore: update sales data $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            git push
+          fi
