@@ -50,8 +50,19 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .chart-wrap { position: relative; width: 100%; height: 320px; }
-  canvas { max-height: 100%; }
+  #timeStat .value {
+    white-space: normal;
+    overflow: visible;
+    word-break: keep-all;
+    line-height: 1.3;
+  }
+  .chart-wrap { position: relative; width: 100%; height: 320px; overflow: hidden; }
+  .chart-wrap canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100% !important;
+    height: 100% !important;
+  }
   .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -20px; padding: 0 20px; }
   table { width: 100%; min-width: 420px; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
@@ -78,6 +89,7 @@
     }
     .stat .label { font-size: 11px; }
     .stat .value { font-size: 19px; }
+    #timeStat .value { font-size: 14px; }
     .stat#timeStat { flex: 1 1 100%; }
     .chart-wrap { height: 240px; }
     table { font-size: 12px; }
@@ -105,7 +117,7 @@
     </div>
     <div class="stat" id="timeStat">
       <div class="label">마지막 갱신 시각</div>
-      <div class="value" id="latestTime" style="font-size:16px;">-</div>
+      <div class="value" id="latestTime">-</div>
     </div>
   </div>
 
@@ -152,7 +164,7 @@ function isMobile() {
 function render(records) {
   const withValue = records.filter(r => typeof r.sales_value === 'number');
   const dateOpts = isMobile()
-    ? { month:'2-digit', day:'2-digit' }
+    ? { hour:'2-digit', minute:'2-digit' }
     : { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' };
   const labels = withValue.map(r => new Date(r.timestamp).toLocaleString('ko-KR', dateOpts));
   const values = withValue.map(r => r.sales_value);
@@ -237,6 +249,11 @@ function render(records) {
         },
       }
     }
+  });
+
+  // 모바일에서 초기 레이아웃이 늦게 잡히는 경우를 대비한 강제 리사이즈
+  requestAnimationFrame(() => {
+    if (window._chart) window._chart.resize();
   });
 }
 
