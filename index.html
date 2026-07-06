@@ -59,20 +59,12 @@
 
   <div class="stat-row">
     <div class="stat">
-      <div class="label">최근 값</div>
+      <div class="label">총 판매량</div>
       <div class="value" id="latestValue">-</div>
     </div>
     <div class="stat">
       <div class="label">마지막 갱신 시각</div>
       <div class="value" id="latestTime" style="font-size:16px;">-</div>
-    </div>
-    <div class="stat">
-      <div class="label">현재 재고</div>
-      <div class="value" id="latestStock">-</div>
-    </div>
-    <div class="stat">
-      <div class="label">누적 기록 수</div>
-      <div class="value" id="recordCount">-</div>
     </div>
   </div>
 
@@ -105,8 +97,6 @@ async function load() {
 }
 
 function render(records) {
-  document.getElementById('recordCount').textContent = records.length;
-
   const withValue = records.filter(r => typeof r.sales_value === 'number');
   const labels = withValue.map(r => new Date(r.timestamp).toLocaleString('ko-KR', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}));
   const values = withValue.map(r => r.sales_value);
@@ -120,9 +110,6 @@ function render(records) {
 
   const latest = records[records.length - 1];
   if (latest) {
-    if (typeof latest.stock_value === 'number') {
-      document.getElementById('latestStock').textContent = latest.stock_value;
-    }
     const tbody = document.querySelector('#optionTable tbody');
     tbody.innerHTML = '';
     (latest.options || []).forEach(opt => {
@@ -157,11 +144,10 @@ function render(records) {
       }
     }
   });
-
 }
 
 load();
-setInterval(load, 60 * 1000); // 브라우저 화면도 1분마다 자동 새로고침
+setInterval(load, 60 * 1000);
 </script>
 </body>
 </html>
