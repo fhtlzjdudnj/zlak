@@ -163,10 +163,17 @@ function isMobile() {
 
 function render(records) {
   const withValue = records.filter(r => typeof r.sales_value === 'number');
-  const dateOpts = isMobile()
-    ? { hour:'2-digit', minute:'2-digit' }
-    : { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' };
-  const labels = withValue.map(r => new Date(r.timestamp).toLocaleString('ko-KR', dateOpts));
+  function formatLabel(ts, mobile) {
+    const d = new Date(ts);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return mobile ? `${mm}/${dd} ${hh}:${mi}` : `${mm}.${dd} ${hh}:${mi}`;
+  }
+
+  const mobile = isMobile();
+  const labels = withValue.map(r => formatLabel(r.timestamp, mobile));
   const values = withValue.map(r => r.sales_value);
 
   if (withValue.length > 0) {
