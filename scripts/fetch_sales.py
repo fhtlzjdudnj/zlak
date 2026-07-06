@@ -1,19 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-sooptore(e-ncp) 상품 옵션 API를 호출해서 판매량(혹은 옵션별 재고) 데이터를
+sooptore(e-ncp) 상품 옵션 API를 호출해서 판매량 데이터를
 data/history.json 에 시계열로 누적 저장하는 스크립트.
 
-주의:
-- e-ncp(shop-api.e-ncp.com)는 여러 쇼핑몰이 공유하는 API 서버라
-  실제 브라우저에서 보내는 것과 비슷한 Referer / Origin / User-Agent
-  헤더가 없으면 400을 반환할 수 있습니다. 아래 REFERER, ORIGIN 값을
-  실제 상품 페이지 도메인으로 맞춰뒀습니다.
-- 응답 JSON의 정확한 구조(어떤 필드가 "판매량"인지)를 모르는 상태라서,
-  1) 알려진 후보 키워드로 자동 탐색하고
-  2) 못 찾으면 원본 응답을 그대로 raw_snapshot 에 저장합니다.
-  첫 실행 후 data/history.json 을 열어서 실제 구조를 확인한 뒤,
-  extract_sales_value() 함수만 정확한 경로로 수정하면 됩니다.
+주의: 이 API는 일반적인 Referer/Origin 외에도 clientid / platform / version
+같은 자체 커스텀 헤더를 검사한다. 브라우저 devtools(Network 탭)에서 확인한
+값을 HEADERS에 그대로 반영해뒀다.
 """
 
 import json
@@ -27,7 +20,6 @@ import requests
 # ---- 설정 -------------------------------------------------------------
 PRODUCT_ID = os.environ.get("PRODUCT_ID", "133850457")
 API_URL = f"https://shop-api.e-ncp.com/products/{PRODUCT_ID}/options"
-PRODUCT_PAGE = f"https://sooptore.sooplive.com/products/{PRODUCT_ID}"
 
 HEADERS = {
     "User-Agent": (
@@ -35,9 +27,15 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/125.0.0.0 Safari/537.36"
     ),
-    "Accept": "application/json, text/plain, */*",
-    "Referer": PRODUCT_PAGE,
+    "Accept": "*/*",
+    "Accept-Language": "ko,en;q=0.9,en-US;q=0.8",
+    "Content-Type": "application/json",
+    "Referer": "https://sooptore.sooplive.com/",
     "Origin": "https://sooptore.sooplive.com",
+    # 이 사이트는 아래 커스텀 헤더가 없으면 400을 반환한다 (브라우저 devtools에서 확인)
+    "clientid": "48ZXrkI0gZ+GuBYnWfHPcQ==",
+    "platform": "PC",
+    "version": "1.0",
 }
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -109,7 +107,6 @@ def main():
         raw = fetch_raw()
     except requests.RequestException as e:
         print(f"[ERROR] API 호출 실패: {e}", file=sys.stderr)
-        # 실패도 기록해서 나중에 원인 파악에 도움이 되게 한다
         history = load_history()
         history["records"].append({
             "timestamp": now,
@@ -123,9 +120,9 @@ def main():
     history = load_history()
     record = {
         "timestamp": now,
-        "sales_value": total_sale,       # 전체 옵션 saleCnt 합계
-        "stock_value": total_stock,      # 전체 옵션 stockCnt 합계
-        "options": breakdown,            # 옵션별 상세 (그래프/표에 활용)
+        "sales_value": total_sale,
+        "stock_value": total_stock,
+        "options": breakdown,
     }
 
     history["records"].append(record)
