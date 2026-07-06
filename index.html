@@ -63,6 +63,10 @@
       <div class="value" id="latestValue">-</div>
     </div>
     <div class="stat">
+      <div class="label">총 판매금액</div>
+      <div class="value" id="latestAmount">-</div>
+    </div>
+    <div class="stat">
       <div class="label">마지막 갱신 시각</div>
       <div class="value" id="latestTime" style="font-size:16px;">-</div>
     </div>
@@ -75,7 +79,7 @@
   <div class="card">
     <h3 style="margin-top:0;">옵션별 현황 (최신 기준)</h3>
     <table id="optionTable">
-      <thead><tr><th>옵션</th><th>판매량</th><th>재고</th></tr></thead>
+      <thead><tr><th>옵션</th><th>가격</th><th>판매량</th><th>판매금액</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -96,6 +100,10 @@ async function load() {
   }
 }
 
+function formatWon(n) {
+  return n.toLocaleString('ko-KR') + '원';
+}
+
 function render(records) {
   const withValue = records.filter(r => typeof r.sales_value === 'number');
   const labels = withValue.map(r => new Date(r.timestamp).toLocaleString('ko-KR', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}));
@@ -110,11 +118,14 @@ function render(records) {
 
   const latest = records[records.length - 1];
   if (latest) {
+    if (typeof latest.amount_value === 'number') {
+      document.getElementById('latestAmount').textContent = formatWon(latest.amount_value);
+    }
     const tbody = document.querySelector('#optionTable tbody');
     tbody.innerHTML = '';
     (latest.options || []).forEach(opt => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${opt.label ?? ''} - ${opt.value ?? ''}</td><td>${opt.saleCnt ?? ''}</td><td>${opt.stockCnt ?? ''}</td>`;
+      tr.innerHTML = `<td>${opt.label ?? ''} - ${opt.value ?? ''}</td><td>${formatWon(opt.price ?? 0)}</td><td>${opt.saleCnt ?? ''}</td><td>${formatWon(opt.amount ?? 0)}</td>`;
       tbody.appendChild(tr);
     });
   }
