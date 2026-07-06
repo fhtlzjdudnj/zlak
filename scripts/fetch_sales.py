@@ -32,7 +32,6 @@ HEADERS = {
     "Content-Type": "application/json",
     "Referer": "https://sooptore.sooplive.com/",
     "Origin": "https://sooptore.sooplive.com",
-    # 이 사이트는 아래 커스텀 헤더가 없으면 400을 반환한다 (브라우저 devtools에서 확인)
     "clientid": "48ZXrkI0gZ+GuBYnWfHPcQ==",
     "platform": "PC",
     "version": "1.0",
@@ -44,29 +43,35 @@ KST = timezone(timedelta(hours=9))
 
 
 def fetch_raw():
-    """
-    응답은 옵션 객체들의 배열이다. 각 옵션 예시:
-    {
-      "optionNo": 514748023,
-      "label": "상품",
-      "value": "일상 ver.세트",
-      "addPrice": 0,
-      "saleCnt": 430,
-      "stockCnt": 9805,
-      ...
-    }
-    """
     resp = requests.get(API_URL, headers=HEADERS, params={"preview": ""}, timeout=15)
     resp.raise_for_status()
     return resp.json()
 
 
+def find_options_list(node):
+    """
+    응답이 [ {...saleCnt...}, ... ] 형태로 바로 오지 않고
+    { "data": [...] } 나 { "result": { "list": [...] } } 처럼
+    감싸져 있을 수도 있어서, saleCnt 키를 가진 딕셔너리들의 리스트를
+    어디에 있든 재귀적으로 찾아낸다.
+    """
+    if isinstance(node, list):
+        if node and isinstance(node[0], dict) and "saleCnt" in node[0]:
+            return node
+        for item in node:
+            found = find_options_list(item)
+            if found is not None:
+                return found
+    elif isinstance(node, dict):
+        for v in node.values():
+            found = find_options_list(v)
+            if found is not None:
+                return found
+    return None
+
+
 def extract_sales(raw):
-    """
-    옵션 배열에서 옵션별 판매량(saleCnt)/재고(stockCnt)를 뽑고,
-    전체 합계 판매량을 계산한다.
-    """
-    options = raw if isinstance(raw, list) else raw.get("options", [])
+    options = find_options_list(raw) or []
 
     breakdown = []
     total_sale = 0
@@ -126,6 +131,10 @@ def main():
     }
 
     history["records"].append(record)
+
+    if not breakdown:
+        record["raw_snapshot"] = raw
+
     save_history(history)
 
     print(f"[OK] {now} 기록 완료. 총 판매량={total_sale}, 총 재고={total_stock}")
