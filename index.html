@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>판매량 추이 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #2a2f3a;
+    --text: #e8eaed;
+    --muted: #9aa4b2;
+    --accent: #5b8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, Roboto, sans-serif;
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .stat-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    min-width: 160px;
+  }
+  .stat .label { color: var(--muted); font-size: 12px; }
+  .stat .value { font-size: 26px; font-weight: 700; margin-top: 4px; }
+  canvas { max-height: 380px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  code { color: var(--accent); }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; background: #23324f; color: var(--accent); margin-left: 8px;
+  }
+  #status { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+  <h1>상품 판매량 추이 <span class="badge">10분 주기 갱신</span></h1>
+  <p class="sub">product_id: 133850457 · data/history.json 기준</p>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="label">최근 값</div>
+      <div class="value" id="latestValue">-</div>
+    </div>
+    <div class="stat">
+      <div class="label">마지막 갱신 시각</div>
+      <div class="value" id="latestTime" style="font-size:16px;">-</div>
+    </div>
+    <div class="stat">
+      <div class="label">현재 재고</div>
+      <div class="value" id="latestStock">-</div>
+    </div>
+    <div class="stat">
+      <div class="label">누적 기록 수</div>
+      <div class="value" id="recordCount">-</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <canvas id="salesChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">옵션별 현황 (최신 기준)</h3>
+    <table id="optionTable">
+      <thead><tr><th>옵션</th><th>판매량</th><th>재고</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <p id="status">불러오는 중...</p>
+
+<script>
+async function load() {
+  const statusEl = document.getElementById('status');
+  try {
+    const res = await fetch('./data/history.json?_=' + Date.now());
+    if (!res.ok) throw new Error('history.json 로드 실패: ' + res.status);
+    const data = await res.json();
+    render(data.records || []);
+    statusEl.textContent = '마지막 새로고침: ' + new Date().toLocaleString('ko-KR');
+  } catch (e) {
+    statusEl.textContent = '오류: ' + e.message;
+  }
+}
+
+function render(records) {
+  document.getElementById('recordCount').textContent = records.length;
+
+  const withValue = records.filter(r => typeof r.sales_value === 'number');
+  const labels = withValue.map(r => new Date(r.timestamp).toLocaleString('ko-KR', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}));
+  const values = withValue.map(r => r.sales_value);
+
+  if (withValue.length > 0) {
+    document.getElementById('latestValue').textContent = values[values.length - 1];
+    document.getElementById('latestTime').textContent = labels[labels.length - 1];
+  } else if (records.length > 0) {
+    document.getElementById('latestTime').textContent = new Date(records[records.length-1].timestamp).toLocaleString('ko-KR');
+  }
+
+  const latest = records[records.length - 1];
+  if (latest) {
+    if (typeof latest.stock_value === 'number') {
+      document.getElementById('latestStock').textContent = latest.stock_value;
+    }
+    const tbody = document.querySelector('#optionTable tbody');
+    tbody.innerHTML = '';
+    (latest.options || []).forEach(opt => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${opt.label ?? ''} - ${opt.value ?? ''}</td><td>${opt.saleCnt ?? ''}</td><td>${opt.stockCnt ?? ''}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  const ctx = document.getElementById('salesChart');
+  if (window._chart) window._chart.destroy();
+  window._chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '전체 판매량 (saleCnt 합계)',
+        data: values,
+        borderColor: '#5b8cff',
+        backgroundColor: 'rgba(91,140,255,0.15)',
+        tension: 0.25,
+        fill: true,
+        pointRadius: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#e8eaed' } } },
+      scales: {
+        x: { ticks: { color: '#9aa4b2' }, grid: { color: '#2a2f3a' } },
+        y: { ticks: { color: '#9aa4b2' }, grid: { color: '#2a2f3a' } },
+      }
+    }
+  });
+
+}
+
+load();
+setInterval(load, 60 * 1000); // 브라우저 화면도 1분마다 자동 새로고침
+</script>
+</body>
+</html>
