@@ -746,7 +746,12 @@ function render(records) {
           grid: { color: borderColor }
         },
         y: {
-          ticks: { color: mutedColor, font: { size: isMobile() ? 10 : 12 } },
+          ticks: {
+            color: mutedColor,
+            font: { size: isMobile() ? 10 : 12 },
+            stepSize: 1,
+            precision: 0,
+          },
           grid: { color: borderColor }
         },
       }
