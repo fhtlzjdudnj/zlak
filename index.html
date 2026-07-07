@@ -122,6 +122,7 @@
   </div>
 
   <div class="card">
+    <h3 style="margin-top:0;">오늘 판매량 추이</h3>
     <div class="chart-wrap">
       <canvas id="salesChart"></canvas>
     </div>
@@ -132,6 +133,16 @@
     <div class="table-scroll">
       <table id="optionTable">
         <thead><tr><th>옵션</th><th>가격</th><th>판매량</th><th>판매금액</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">일별 판매량</h3>
+    <div class="table-scroll">
+      <table id="dailyTable">
+        <thead><tr><th>날짜</th><th>그날 판매량</th><th>누적 판매량</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -161,6 +172,14 @@ function isMobile() {
   return window.innerWidth <= 640;
 }
 
+function dateKeyKST(ts) {
+  const d = new Date(ts);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function render(records) {
   const withValue = records.filter(r => typeof r.sales_value === 'number');
   function formatLabel(ts, mobile) {
@@ -173,12 +192,18 @@ function render(records) {
   }
 
   const mobile = isMobile();
-  const labels = withValue.map(r => formatLabel(r.timestamp, mobile));
-  const values = withValue.map(r => r.sales_value);
+
+  // ---- 오늘 데이터만 그래프에 표시 ----
+  const todayKey = dateKeyKST(new Date());
+  const todayRecords = withValue.filter(r => dateKeyKST(r.timestamp) === todayKey);
+
+  const labels = todayRecords.map(r => formatLabel(r.timestamp, mobile));
+  const values = todayRecords.map(r => r.sales_value);
 
   if (withValue.length > 0) {
-    document.getElementById('latestValue').textContent = values[values.length - 1];
-    document.getElementById('latestTime').textContent = labels[labels.length - 1];
+    const lastAll = withValue[withValue.length - 1];
+    document.getElementById('latestValue').textContent = lastAll.sales_value;
+    document.getElementById('latestTime').textContent = formatLabel(lastAll.timestamp, mobile);
   } else if (records.length > 0) {
     document.getElementById('latestTime').textContent = new Date(records[records.length-1].timestamp).toLocaleString('ko-KR');
   }
@@ -197,6 +222,29 @@ function render(records) {
     });
   }
 
+  // ---- 일별 판매량 요약 표 ----
+  const dailyMap = new Map();
+  withValue.forEach(r => {
+    dailyMap.set(dateKeyKST(r.timestamp), r); // 시간순 정렬 가정, 그날의 마지막 기록으로 덮어씀
+  });
+  const dailyKeys = Array.from(dailyMap.keys()).sort();
+  const dailyRows = [];
+  let prevTotal = null;
+  dailyKeys.forEach(key => {
+    const rec = dailyMap.get(key);
+    const total = rec.sales_value;
+    const diff = prevTotal === null ? total : total - prevTotal;
+    dailyRows.push({ key, diff, total });
+    prevTotal = total;
+  });
+  const dailyBody = document.querySelector('#dailyTable tbody');
+  dailyBody.innerHTML = '';
+  dailyRows.slice().reverse().forEach(row => { // 최신 날짜가 위로 오도록
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.key}</td><td>${row.diff.toLocaleString('ko-KR')}</td><td>${row.total.toLocaleString('ko-KR')}</td>`;
+    dailyBody.appendChild(tr);
+  });
+
   const ctx = document.getElementById('salesChart');
   if (window._chart) window._chart.destroy();
   window._chart = new Chart(ctx, {
@@ -204,7 +252,7 @@ function render(records) {
     data: {
       labels,
       datasets: [{
-        label: '전체 판매량 (saleCnt 합계)',
+        label: '오늘 판매량 (saleCnt 합계)',
         data: values,
         borderColor: '#5b8cff',
         backgroundColor: 'rgba(91,140,255,0.15)',
