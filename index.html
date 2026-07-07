@@ -190,6 +190,68 @@
 
   #status { color: var(--muted); font-size: 13px; }
 
+  /* ---- 반응하는 마스코트 캐릭터 ---- */
+  .mascot-wrap {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+  }
+  .mascot-bubble {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+    max-width: 160px;
+    text-align: center;
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  }
+  .mascot-bubble.show { opacity: 1; transform: translateY(0) scale(1); }
+  #mascotSvg { filter: drop-shadow(0 4px 10px rgba(0,0,0,0.25)); }
+
+  @keyframes mascotBob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  .mascot-body-anim { animation: mascotBob 2.4s ease-in-out infinite; }
+
+  @keyframes mascotBounce {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.15, 0.85) translateY(4px); }
+    50% { transform: scale(0.9, 1.15) translateY(-10px); }
+    70% { transform: scale(1.05, 0.95); }
+    100% { transform: scale(1); }
+  }
+  .mascot-bounce { animation: mascotBounce 0.6s ease; }
+
+  @keyframes mascotSad {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(4px) rotate(-3deg); }
+  }
+  .mascot-sad { animation: mascotSad 1.6s ease-in-out infinite; }
+
+  @keyframes mascotEcstatic {
+    0%, 100% { transform: rotate(0deg) scale(1); }
+    25% { transform: rotate(-8deg) scale(1.08); }
+    75% { transform: rotate(8deg) scale(1.08); }
+  }
+  .mascot-ecstatic { animation: mascotEcstatic 0.5s ease-in-out 3; }
+
+  @media (max-width: 640px) {
+    .mascot-wrap { bottom: 12px; right: 12px; }
+    #mascotSvg { width: 56px; height: 56px; }
+  }
+
   /* ---- Mobile breakpoints ---- */
   @media (max-width: 640px) {
     body { padding: 14px; }
@@ -280,6 +342,16 @@
   </div>
 
   <p id="status">불러오는 중...</p>
+
+  <div class="mascot-wrap" id="mascotWrap">
+    <div class="mascot-bubble" id="mascotBubble"></div>
+    <svg id="mascotSvg" viewBox="0 0 120 120" width="72" height="72">
+      <circle id="mascotBody" cx="60" cy="65" r="45" fill="#5b8cff"/>
+      <circle cx="42" cy="55" r="7" fill="#1a1d23"/>
+      <circle cx="78" cy="55" r="7" fill="#1a1d23"/>
+      <path id="mascotMouth" d="M 40 80 Q 60 95 80 80" stroke="#1a1d23" stroke-width="4" fill="none" stroke-linecap="round"/>
+    </svg>
+  </div>
 
 <script>
 // ---- 테마 토글 ----
@@ -430,6 +502,62 @@ function renderRaceChart(optionSource) {
   });
 }
 
+// ---- 반응하는 마스코트 캐릭터 ----
+const MASCOT_PHRASES = {
+  ecstatic: ['대박 터졌다!! 🎉', '이 속도 미쳤어요!', '오늘 완전 신기록 각!'],
+  happy: ['오, 잘 팔리는데요?', '순항 중이에요 👍', '좋아 좋아~'],
+  neutral: ['음... 조용하네요', '잠잠한 시간이에요', '다음 판매를 기다리는 중'],
+  sad: ['어... 요즘 왜 이래요 😢', '힘내야 할 때예요', '잠깐 주춤한 것 같아요'],
+};
+
+const MASCOT_LOOK = {
+  ecstatic: { color: '#ffcc33', mouth: 'M 36 75 Q 60 100 84 75' },
+  happy:    { color: '#4cd964', mouth: 'M 40 78 Q 60 92 80 78' },
+  neutral:  { color: '#9aa4b2', mouth: 'M 42 82 L 78 82' },
+  sad:      { color: '#6b7ea8', mouth: 'M 40 88 Q 60 74 80 88' },
+};
+
+let mascotMaxVelocity = 0;
+
+function updateMascot(velocity) {
+  const svg = document.getElementById('mascotSvg');
+  const body = document.getElementById('mascotBody');
+  const mouth = document.getElementById('mascotMouth');
+  const bubble = document.getElementById('mascotBubble');
+  if (typeof velocity !== 'number') return;
+
+  let mood;
+  if (velocity > 0 && velocity >= mascotMaxVelocity) {
+    mood = 'ecstatic';
+    mascotMaxVelocity = velocity;
+  } else if (velocity > 0) {
+    mood = 'happy';
+  } else if (velocity === 0) {
+    mood = 'neutral';
+  } else {
+    mood = 'sad';
+  }
+
+  const look = MASCOT_LOOK[mood];
+  body.setAttribute('fill', look.color);
+  mouth.setAttribute('d', look.mouth);
+
+  svg.classList.remove('mascot-bounce', 'mascot-sad', 'mascot-ecstatic', 'mascot-body-anim');
+  void svg.offsetWidth;
+  if (mood === 'ecstatic') svg.classList.add('mascot-ecstatic');
+  else if (mood === 'sad') svg.classList.add('mascot-sad');
+  else svg.classList.add('mascot-body-anim');
+  if (mood === 'happy' || mood === 'ecstatic') {
+    setTimeout(() => svg.classList.add('mascot-bounce'), 50);
+  }
+
+  const phrases = MASCOT_PHRASES[mood];
+  bubble.textContent = phrases[Math.floor(Math.random() * phrases.length)];
+  bubble.classList.add('show');
+  clearTimeout(window._mascotBubbleTimer);
+  window._mascotBubbleTimer = setTimeout(() => bubble.classList.remove('show'), 4000);
+}
+
 function render(records) {
   window._lastRecords = records;
 
@@ -487,6 +615,7 @@ function render(records) {
       const velocity = newSales - baseline.sales_value;
       velocityEl.textContent = (velocity >= 0 ? '+' : '') + velocity.toLocaleString('ko-KR');
       velocityEl.style.color = velocity > 0 ? 'var(--good)' : (velocity < 0 ? 'var(--bad)' : '');
+      updateMascot(velocity);
     } else {
       velocityEl.textContent = '-';
       velocityEl.style.color = '';
