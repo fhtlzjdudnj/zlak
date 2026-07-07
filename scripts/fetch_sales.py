@@ -24,6 +24,11 @@ API_URL = f"https://shop-api.e-ncp.com/products/{PRODUCT_ID}/options"
 # 상품 기본 판매가 (원). 옵션의 addPrice가 이 위에 추가로 더해진다.
 BASE_PRICE_KRW = 295000
 
+# history.json이 무한정 커지는 걸 막기 위한 설정.
+# 최근 KEEP_FULL_DAYS 일은 그대로 두고, 그보다 오래된 기록은
+# 시간대(연-월-일-시)별로 1개만 남긴다.
+KEEP_FULL_DAYS = 3
+
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -109,6 +114,40 @@ def save_history(history):
         json.dump(history, f, ensure_ascii=False, indent=2)
 
 
+def prune_history(history, keep_full_days=KEEP_FULL_DAYS):
+    """최근 keep_full_days 일은 그대로 두고, 그보다 오래된 기록은
+    시간대(연-월-일-시)별로 1개만 남겨서 파일이 무한정 커지는 것을 막는다."""
+    now = datetime.now(KST)
+    cutoff = now - timedelta(days=keep_full_days)
+
+    recent = []
+    old = []
+    for r in history.get("records", []):
+        ts_raw = r.get("timestamp")
+        try:
+            ts = datetime.fromisoformat(ts_raw)
+        except (TypeError, ValueError):
+            # timestamp가 없거나 파싱 실패한 기록(예: 에러 기록)은 최근 목록에 그대로 보존
+            recent.append(r)
+            continue
+
+        if ts >= cutoff:
+            recent.append(r)
+        else:
+            old.append((ts, r))
+
+    # 오래된 기록은 시간대별로 마지막 값만 남김 (시간순으로 처리해 마지막 값이 남도록)
+    old.sort(key=lambda pair: pair[0])
+    seen_hours = {}
+    for ts, r in old:
+        key = ts.strftime("%Y-%m-%d %H")
+        seen_hours[key] = r
+
+    thinned_old = list(seen_hours.values())
+    history["records"] = thinned_old + recent
+    return history
+
+
 def main():
     now = datetime.now(KST).isoformat()
 
@@ -121,6 +160,7 @@ def main():
             "timestamp": now,
             "error": str(e),
         })
+        history = prune_history(history)
         save_history(history)
         sys.exit(1)
 
@@ -140,6 +180,7 @@ def main():
     if not breakdown:
         record["raw_snapshot"] = raw
 
+    history = prune_history(history)
     save_history(history)
 
     print(f"[OK] {now} 기록 완료. 총 판매량={total_sale}, 총 판매금액={total_amount}원")
