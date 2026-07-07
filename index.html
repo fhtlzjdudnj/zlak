@@ -13,6 +13,8 @@
     --text: #e8eaed;
     --muted: #9aa4b2;
     --accent: #5b8cff;
+    --good: #4cd964;
+    --bad: #ff5c5c;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html { -webkit-text-size-adjust: 100%; }
@@ -40,8 +42,9 @@
     padding: 16px 20px;
     flex: 1 1 160px;
     min-width: 0;
+    transition: background 0.3s ease, border-color 0.3s ease;
   }
-  .stat .label { color: var(--muted); font-size: 12px; }
+  .stat .label { color: var(--muted); font-size: 12px; display: flex; align-items: center; }
   .stat .value {
     font-size: 26px;
     font-weight: 700;
@@ -56,6 +59,31 @@
     word-break: keep-all;
     line-height: 1.3;
   }
+
+  /* ---- 값이 증가했을 때 잠깐 반짝이는 효과 ---- */
+  .stat.flash { animation: flashPulse 1.1s ease; }
+  @keyframes flashPulse {
+    0%   { background: var(--panel); border-color: var(--border); }
+    25%  { background: rgba(76, 217, 100, 0.18); border-color: var(--good); }
+    100% { background: var(--panel); border-color: var(--border); }
+  }
+
+  /* ---- 살아있음을 보여주는 pulse 점 ---- */
+  .live-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--good);
+    margin-left: 6px;
+    flex-shrink: 0;
+    animation: livePulse 1.8s ease-in-out infinite;
+  }
+  @keyframes livePulse {
+    0%   { box-shadow: 0 0 0 0 rgba(76,217,100,0.55); }
+    70%  { box-shadow: 0 0 0 6px rgba(76,217,100,0); }
+    100% { box-shadow: 0 0 0 0 rgba(76,217,100,0); }
+  }
+
   .chart-wrap { position: relative; width: 100%; height: 320px; overflow: hidden; }
   .chart-wrap canvas {
     position: absolute;
@@ -73,6 +101,20 @@
     font-size: 11px; background: #23324f; color: var(--accent); margin-left: 8px;
     white-space: nowrap;
   }
+
+  /* ---- 전일 대비 증감 배지 ---- */
+  .change {
+    display: inline-block;
+    font-size: 11px;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .change.up   { color: var(--good); background: rgba(76,217,100,0.12); }
+  .change.down { color: var(--bad);  background: rgba(255,92,92,0.12); }
+  .change.flat { color: var(--muted); background: rgba(154,164,178,0.12); }
+
   #status { color: var(--muted); font-size: 13px; }
 
   /* ---- Mobile breakpoints ---- */
@@ -107,16 +149,16 @@
   <p class="sub">product_id: 133850457 · data/history.json 기준</p>
 
   <div class="stat-row">
-    <div class="stat">
+    <div class="stat" id="valueStat">
       <div class="label">총 판매량</div>
       <div class="value" id="latestValue">-</div>
     </div>
-    <div class="stat">
+    <div class="stat" id="amountStat">
       <div class="label">총 판매금액</div>
       <div class="value" id="latestAmount">-</div>
     </div>
     <div class="stat" id="timeStat">
-      <div class="label">마지막 갱신 시각</div>
+      <div class="label">마지막 갱신 시각 <span class="live-dot"></span></div>
       <div class="value" id="latestTime">-</div>
     </div>
   </div>
@@ -180,6 +222,36 @@ function dateKeyKST(ts) {
   return `${y}-${m}-${day}`;
 }
 
+// ---- 숫자 카운트업 애니메이션 ----
+function animateValue(el, start, end, duration, formatter) {
+  if (start === end) {
+    el.textContent = formatter(end);
+    return;
+  }
+  const range = end - start;
+  const startTime = performance.now();
+  function step(now) {
+    const progress = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 2); // ease-out
+    const value = Math.round(start + range * eased);
+    el.textContent = formatter(value);
+    if (progress < 1) {
+      requestAnimationFrame(step);
+    } else {
+      el.textContent = formatter(end);
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+// ---- 값 증가 시 카드에 반짝임 효과 ----
+function flashCard(el) {
+  if (!el) return;
+  el.classList.remove('flash');
+  void el.offsetWidth; // 리플로우 강제 (애니메이션 재시작용)
+  el.classList.add('flash');
+}
+
 function render(records) {
   const withValue = records.filter(r => typeof r.sales_value === 'number');
   function formatLabel(ts, mobile) {
@@ -202,7 +274,20 @@ function render(records) {
 
   if (withValue.length > 0) {
     const lastAll = withValue[withValue.length - 1];
-    document.getElementById('latestValue').textContent = lastAll.sales_value;
+    const newSales = lastAll.sales_value;
+    const latestValueEl = document.getElementById('latestValue');
+    const prevSales = window._lastSalesValue;
+
+    if (typeof prevSales === 'number') {
+      animateValue(latestValueEl, prevSales, newSales, 700, n => n.toLocaleString('ko-KR'));
+      if (newSales > prevSales) {
+        flashCard(document.getElementById('valueStat'));
+      }
+    } else {
+      latestValueEl.textContent = newSales.toLocaleString('ko-KR');
+    }
+    window._lastSalesValue = newSales;
+
     document.getElementById('latestTime').textContent = formatLabel(lastAll.timestamp, mobile);
   } else if (records.length > 0) {
     document.getElementById('latestTime').textContent = new Date(records[records.length-1].timestamp).toLocaleString('ko-KR');
@@ -211,7 +296,18 @@ function render(records) {
   const latest = records[records.length - 1];
   if (latest) {
     if (typeof latest.amount_value === 'number') {
-      document.getElementById('latestAmount').textContent = formatWon(latest.amount_value);
+      const amountEl = document.getElementById('latestAmount');
+      const prevAmount = window._lastAmountValue;
+      const newAmount = latest.amount_value;
+      if (typeof prevAmount === 'number') {
+        animateValue(amountEl, prevAmount, newAmount, 700, formatWon);
+        if (newAmount > prevAmount) {
+          flashCard(document.getElementById('amountStat'));
+        }
+      } else {
+        amountEl.textContent = formatWon(newAmount);
+      }
+      window._lastAmountValue = newAmount;
     }
     const tbody = document.querySelector('#optionTable tbody');
     tbody.innerHTML = '';
@@ -230,18 +326,29 @@ function render(records) {
   const dailyKeys = Array.from(dailyMap.keys()).sort();
   const dailyRows = [];
   let prevTotal = null;
+  let prevDiff = null;
   dailyKeys.forEach(key => {
     const rec = dailyMap.get(key);
     const total = rec.sales_value;
     const diff = prevTotal === null ? total : total - prevTotal;
-    dailyRows.push({ key, diff, total });
+
+    let changeBadge = '';
+    if (prevDiff !== null && prevDiff !== 0) {
+      const pct = ((diff - prevDiff) / prevDiff) * 100;
+      const arrow = pct > 0.05 ? '▲' : (pct < -0.05 ? '▼' : '－');
+      const cls = pct > 0.05 ? 'up' : (pct < -0.05 ? 'down' : 'flat');
+      changeBadge = `<span class="change ${cls}">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
+    }
+
+    dailyRows.push({ key, diff, total, changeBadge });
     prevTotal = total;
+    prevDiff = diff;
   });
   const dailyBody = document.querySelector('#dailyTable tbody');
   dailyBody.innerHTML = '';
   dailyRows.slice().reverse().forEach(row => { // 최신 날짜가 위로 오도록
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${row.key}</td><td>${row.diff.toLocaleString('ko-KR')}</td><td>${row.total.toLocaleString('ko-KR')}</td>`;
+    tr.innerHTML = `<td>${row.key}</td><td>${row.diff.toLocaleString('ko-KR')} ${row.changeBadge}</td><td>${row.total.toLocaleString('ko-KR')}</td>`;
     dailyBody.appendChild(tr);
   });
 
