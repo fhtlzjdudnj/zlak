@@ -16,6 +16,16 @@
     --good: #4cd964;
     --bad: #ff5c5c;
   }
+  body.light {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #e2e5ea;
+    --text: #1a1d23;
+    --muted: #6b7280;
+    --accent: #3b6fe0;
+    --good: #1f9d4f;
+    --bad: #d93a3a;
+  }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html { -webkit-text-size-adjust: 100%; }
   body {
@@ -24,15 +34,29 @@
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, Roboto, sans-serif;
     padding: 24px;
+    transition: background 0.2s ease, color 0.2s ease;
   }
+  .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
   h1 { font-size: 20px; margin-bottom: 4px; line-height: 1.3; }
   .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; word-break: break-all; }
+  .theme-btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .theme-btn:hover { border-color: var(--accent); }
   .card {
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 20px;
     margin-bottom: 20px;
+    transition: background 0.2s ease, border-color 0.2s ease;
   }
   .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
   .stat {
@@ -85,6 +109,7 @@
   }
 
   .chart-wrap { position: relative; width: 100%; height: 320px; overflow: hidden; }
+  .chart-wrap.small { height: 260px; }
   .chart-wrap canvas {
     position: absolute;
     top: 0; left: 0;
@@ -99,6 +124,18 @@
   .badge {
     display: inline-block; padding: 2px 8px; border-radius: 999px;
     font-size: 11px; background: #23324f; color: var(--accent); margin-left: 8px;
+    white-space: nowrap;
+  }
+  body.light .badge { background: #e8edff; }
+  .best-badge {
+    display: none;
+    font-size: 11px;
+    background: rgba(76,217,100,0.14);
+    color: var(--good);
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 8px;
+    vertical-align: middle;
     white-space: nowrap;
   }
 
@@ -134,6 +171,7 @@
     #timeStat .value { font-size: 14px; }
     .stat#timeStat { flex: 1 1 100%; }
     .chart-wrap { height: 240px; }
+    .chart-wrap.small { height: 220px; }
     table { font-size: 12px; }
     th, td { padding: 6px; }
     h3 { font-size: 15px; }
@@ -145,13 +183,22 @@
 </style>
 </head>
 <body>
-  <h1>상품 판매량 추이 <span class="badge">60분 주기 갱신</span></h1>
-  <p class="sub">product_id: 133850457 · data/history.json 기준</p>
+  <div class="header-row">
+    <div>
+      <h1>상품 판매량 추이 <span class="badge">60분 주기 갱신</span></h1>
+      <p class="sub">product_id: 133850457 · data/history.json 기준</p>
+    </div>
+    <button class="theme-btn" id="themeToggle" type="button">☀️ 라이트모드</button>
+  </div>
 
   <div class="stat-row">
     <div class="stat" id="valueStat">
       <div class="label">총 판매량</div>
       <div class="value" id="latestValue">-</div>
+    </div>
+    <div class="stat" id="velocityStat">
+      <div class="label">최근 1시간 판매량</div>
+      <div class="value" id="velocityValue">-</div>
     </div>
     <div class="stat" id="amountStat">
       <div class="label">총 판매금액</div>
@@ -164,9 +211,16 @@
   </div>
 
   <div class="card">
-    <h3 style="margin-top:0;">오늘 판매량 추이</h3>
+    <h3 style="margin-top:0;">오늘 판매량 추이 <span class="best-badge" id="bestHourBadge"></span></h3>
     <div class="chart-wrap">
       <canvas id="salesChart"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">옵션별 판매 비율</h3>
+    <div class="chart-wrap small">
+      <canvas id="optionChart"></canvas>
     </div>
   </div>
 
@@ -193,6 +247,29 @@
   <p id="status">불러오는 중...</p>
 
 <script>
+// ---- 테마 토글 ----
+const themeToggleBtn = document.getElementById('themeToggle');
+
+function applyTheme(theme) {
+  document.body.classList.toggle('light', theme === 'light');
+  themeToggleBtn.textContent = theme === 'light' ? '🌙 다크모드' : '☀️ 라이트모드';
+}
+
+const savedTheme = localStorage.getItem('dashboard-theme') || 'dark';
+applyTheme(savedTheme);
+
+themeToggleBtn.addEventListener('click', () => {
+  const current = document.body.classList.contains('light') ? 'light' : 'dark';
+  const next = current === 'light' ? 'dark' : 'light';
+  localStorage.setItem('dashboard-theme', next);
+  applyTheme(next);
+  if (window._lastRecords) render(window._lastRecords); // 차트 색상도 새 테마로 다시 그림
+});
+
+function cssVar(name) {
+  return getComputedStyle(document.body).getPropertyValue(name).trim();
+}
+
 async function load() {
   const statusEl = document.getElementById('status');
   try {
@@ -252,7 +329,36 @@ function flashCard(el) {
   el.classList.add('flash');
 }
 
+// ---- 약 1시간 전 기록 찾기 (판매 속도 계산용) ----
+function findBaselineRecord(records, latestTs) {
+  const targetTime = new Date(latestTs).getTime() - 60 * 60 * 1000;
+  let best = null;
+  for (const r of records) {
+    const t = new Date(r.timestamp).getTime();
+    if (t <= targetTime) {
+      if (!best || t > new Date(best.timestamp).getTime()) best = r;
+    }
+  }
+  return best;
+}
+
+// ---- 오늘 중 가장 많이 팔린 시간대 찾기 ----
+function computeBestHour(records) {
+  if (records.length < 2) return null;
+  let best = null;
+  for (let i = 1; i < records.length; i++) {
+    const diff = records[i].sales_value - records[i - 1].sales_value;
+    if (!best || diff > best.diff) {
+      const d = new Date(records[i].timestamp);
+      best = { diff, label: `${String(d.getHours()).padStart(2, '0')}시` };
+    }
+  }
+  return best;
+}
+
 function render(records) {
+  window._lastRecords = records;
+
   const withValue = records.filter(r => typeof r.sales_value === 'number');
   function formatLabel(ts, mobile) {
     const d = new Date(ts);
@@ -272,8 +378,19 @@ function render(records) {
   const labels = todayRecords.map(r => formatLabel(r.timestamp, mobile));
   const values = todayRecords.map(r => r.sales_value);
 
+  // ---- 오늘 최고 판매 시간대 배지 ----
+  const bestHour = computeBestHour(todayRecords);
+  const bestHourBadge = document.getElementById('bestHourBadge');
+  if (bestHour && bestHour.diff > 0) {
+    bestHourBadge.textContent = `🏆 오늘 최고 ${bestHour.diff.toLocaleString('ko-KR')}개 (${bestHour.label})`;
+    bestHourBadge.style.display = 'inline-block';
+  } else {
+    bestHourBadge.style.display = 'none';
+  }
+
+  let lastAll = null;
   if (withValue.length > 0) {
-    const lastAll = withValue[withValue.length - 1];
+    lastAll = withValue[withValue.length - 1];
     const newSales = lastAll.sales_value;
     const latestValueEl = document.getElementById('latestValue');
     const prevSales = window._lastSalesValue;
@@ -289,8 +406,20 @@ function render(records) {
     window._lastSalesValue = newSales;
 
     document.getElementById('latestTime').textContent = formatLabel(lastAll.timestamp, mobile);
+
+    // ---- 최근 1시간 판매 속도 ----
+    const baseline = findBaselineRecord(withValue, lastAll.timestamp);
+    const velocityEl = document.getElementById('velocityValue');
+    if (baseline) {
+      const velocity = newSales - baseline.sales_value;
+      velocityEl.textContent = (velocity >= 0 ? '+' : '') + velocity.toLocaleString('ko-KR');
+      velocityEl.style.color = velocity > 0 ? 'var(--good)' : (velocity < 0 ? 'var(--bad)' : '');
+    } else {
+      velocityEl.textContent = '-';
+      velocityEl.style.color = '';
+    }
   } else if (records.length > 0) {
-    document.getElementById('latestTime').textContent = new Date(records[records.length-1].timestamp).toLocaleString('ko-KR');
+    document.getElementById('latestTime').textContent = new Date(records[records.length - 1].timestamp).toLocaleString('ko-KR');
   }
 
   const latest = records[records.length - 1];
@@ -352,6 +481,12 @@ function render(records) {
     dailyBody.appendChild(tr);
   });
 
+  // ---- 판매량 추이 라인 차트 ----
+  const textColor = cssVar('--text');
+  const mutedColor = cssVar('--muted');
+  const borderColor = cssVar('--border');
+  const accentColor = cssVar('--accent') || '#5b8cff';
+
   const ctx = document.getElementById('salesChart');
   if (window._chart) window._chart.destroy();
   window._chart = new Chart(ctx, {
@@ -361,7 +496,7 @@ function render(records) {
       datasets: [{
         label: '오늘 판매량 (saleCnt 합계)',
         data: values,
-        borderColor: '#5b8cff',
+        borderColor: accentColor,
         backgroundColor: 'rgba(91,140,255,0.15)',
         tension: 0.25,
         fill: true,
@@ -380,7 +515,7 @@ function render(records) {
       plugins: {
         legend: {
           labels: {
-            color: '#e8eaed',
+            color: textColor,
             font: { size: isMobile() ? 11 : 12 },
             boxWidth: isMobile() ? 12 : 40,
           }
@@ -397,25 +532,67 @@ function render(records) {
       scales: {
         x: {
           ticks: {
-            color: '#9aa4b2',
+            color: mutedColor,
             font: { size: isMobile() ? 10 : 12 },
             maxRotation: isMobile() ? 45 : 0,
             autoSkip: true,
             maxTicksLimit: isMobile() ? 6 : 12,
           },
-          grid: { color: '#2a2f3a' }
+          grid: { color: borderColor }
         },
         y: {
-          ticks: { color: '#9aa4b2', font: { size: isMobile() ? 10 : 12 } },
-          grid: { color: '#2a2f3a' }
+          ticks: { color: mutedColor, font: { size: isMobile() ? 10 : 12 } },
+          grid: { color: borderColor }
         },
       }
     }
   });
 
+  // ---- 옵션별 판매 비율 도넛 차트 ----
+  const optionSource = latest && latest.options ? latest.options : [];
+  const optionLabels = optionSource.map(o => `${o.label ?? ''} ${o.value ?? ''}`.trim());
+  const optionValues = optionSource.map(o => o.saleCnt ?? 0);
+  const donutColors = ['#5b8cff', '#ff9f5b', '#4cd964', '#ff5c5c', '#a276ff', '#ffd166'];
+
+  const ctx2 = document.getElementById('optionChart');
+  if (window._optionChart) window._optionChart.destroy();
+  if (optionValues.length > 0) {
+    window._optionChart = new Chart(ctx2, {
+      type: 'doughnut',
+      data: {
+        labels: optionLabels,
+        datasets: [{
+          data: optionValues,
+          backgroundColor: donutColors,
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              color: textColor,
+              font: { size: isMobile() ? 11 : 12 },
+              boxWidth: isMobile() ? 12 : 16,
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: (item) => `${item.label}: ${item.parsed.toLocaleString('ko-KR')}개`,
+            }
+          }
+        }
+      }
+    });
+  }
+
   // 모바일에서 초기 레이아웃이 늦게 잡히는 경우를 대비한 강제 리사이즈
   requestAnimationFrame(() => {
     if (window._chart) window._chart.resize();
+    if (window._optionChart) window._optionChart.resize();
   });
 }
 
