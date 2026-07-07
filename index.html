@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png">
+<link rel="manifest" href="/site.webmanifest">
 <title>판매량 추이 대시보드</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
@@ -109,7 +114,6 @@
   }
 
   .chart-wrap { position: relative; width: 100%; height: 320px; overflow: hidden; }
-  .chart-wrap.small { height: 260px; }
   .chart-wrap canvas {
     position: absolute;
     top: 0; left: 0;
@@ -152,6 +156,38 @@
   .change.down { color: var(--bad);  background: rgba(255,92,92,0.12); }
   .change.flat { color: var(--muted); background: rgba(154,164,178,0.12); }
 
+  /* ---- 옵션별 판매 경쟁 (레이스 바) ---- */
+  .race-row { margin-bottom: 16px; }
+  .race-row:last-child { margin-bottom: 0; }
+  .race-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 13px;
+    margin-bottom: 6px;
+    gap: 8px;
+  }
+  .race-name { font-weight: 600; }
+  .race-value { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .race-track {
+    position: relative;
+    height: 24px;
+    background: var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .race-fill {
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    transition: width 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .race-fill.leader {
+    box-shadow: 0 0 14px rgba(91, 140, 255, 0.55);
+  }
+
   #status { color: var(--muted); font-size: 13px; }
 
   /* ---- Mobile breakpoints ---- */
@@ -171,10 +207,11 @@
     #timeStat .value { font-size: 14px; }
     .stat#timeStat { flex: 1 1 100%; }
     .chart-wrap { height: 240px; }
-    .chart-wrap.small { height: 220px; }
     table { font-size: 12px; }
     th, td { padding: 6px; }
     h3 { font-size: 15px; }
+    .race-label { font-size: 12px; }
+    .race-track { height: 20px; }
   }
 
   @media (max-width: 380px) {
@@ -218,10 +255,8 @@
   </div>
 
   <div class="card">
-    <h3 style="margin-top:0;">옵션별 판매 비율</h3>
-    <div class="chart-wrap small">
-      <canvas id="optionChart"></canvas>
-    </div>
+    <h3 style="margin-top:0;">옵션별 판매 경쟁</h3>
+    <div id="raceContainer"></div>
   </div>
 
   <div class="card">
@@ -356,6 +391,45 @@ function computeBestHour(records) {
   return best;
 }
 
+// ---- 옵션별 판매 경쟁 레이스 바 렌더링 ----
+const RACE_COLORS = ['#5b8cff', '#ff9f5b', '#4cd964', '#ff5c5c', '#a276ff', '#ffd166'];
+
+function renderRaceChart(optionSource) {
+  const container = document.getElementById('raceContainer');
+  container.innerHTML = '';
+  if (!optionSource.length) return;
+
+  const total = optionSource.reduce((s, o) => s + (o.saleCnt || 0), 0) || 1;
+  const maxVal = Math.max(...optionSource.map(o => o.saleCnt || 0));
+
+  optionSource.forEach((opt, i) => {
+    const val = opt.saleCnt || 0;
+    const pct = total ? (val / total) * 100 : 0;
+    const isLeader = maxVal > 0 && val === maxVal;
+
+    const row = document.createElement('div');
+    row.className = 'race-row';
+    row.innerHTML = `
+      <div class="race-label">
+        <span class="race-name">${isLeader ? '👑 ' : ''}${opt.label ?? ''} ${opt.value ?? ''}</span>
+        <span class="race-value">${val.toLocaleString('ko-KR')}개 · ${pct.toFixed(1)}%</span>
+      </div>
+      <div class="race-track">
+        <div class="race-fill${isLeader ? ' leader' : ''}" style="background:${RACE_COLORS[i % RACE_COLORS.length]}"></div>
+      </div>
+    `;
+    container.appendChild(row);
+
+    const fillEl = row.querySelector('.race-fill');
+    // 더블 rAF로 브라우저가 0% 상태를 먼저 그린 뒤 목표 폭으로 트랜지션 시키도록 보장
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        fillEl.style.width = pct + '%';
+      });
+    });
+  });
+}
+
 function render(records) {
   window._lastRecords = records;
 
@@ -388,9 +462,8 @@ function render(records) {
     bestHourBadge.style.display = 'none';
   }
 
-  let lastAll = null;
   if (withValue.length > 0) {
-    lastAll = withValue[withValue.length - 1];
+    const lastAll = withValue[withValue.length - 1];
     const newSales = lastAll.sales_value;
     const latestValueEl = document.getElementById('latestValue');
     const prevSales = window._lastSalesValue;
@@ -446,6 +519,9 @@ function render(records) {
       tbody.appendChild(tr);
     });
   }
+
+  // ---- 옵션별 판매 경쟁 (레이스 바) ----
+  renderRaceChart(latest && latest.options ? latest.options : []);
 
   // ---- 일별 판매량 요약 표 ----
   const dailyMap = new Map();
@@ -548,51 +624,9 @@ function render(records) {
     }
   });
 
-  // ---- 옵션별 판매 비율 도넛 차트 ----
-  const optionSource = latest && latest.options ? latest.options : [];
-  const optionLabels = optionSource.map(o => `${o.label ?? ''} ${o.value ?? ''}`.trim());
-  const optionValues = optionSource.map(o => o.saleCnt ?? 0);
-  const donutColors = ['#5b8cff', '#ff9f5b', '#4cd964', '#ff5c5c', '#a276ff', '#ffd166'];
-
-  const ctx2 = document.getElementById('optionChart');
-  if (window._optionChart) window._optionChart.destroy();
-  if (optionValues.length > 0) {
-    window._optionChart = new Chart(ctx2, {
-      type: 'doughnut',
-      data: {
-        labels: optionLabels,
-        datasets: [{
-          data: optionValues,
-          backgroundColor: donutColors,
-          borderWidth: 0,
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: {
-              color: textColor,
-              font: { size: isMobile() ? 11 : 12 },
-              boxWidth: isMobile() ? 12 : 16,
-            }
-          },
-          tooltip: {
-            callbacks: {
-              label: (item) => `${item.label}: ${item.parsed.toLocaleString('ko-KR')}개`,
-            }
-          }
-        }
-      }
-    });
-  }
-
   // 모바일에서 초기 레이아웃이 늦게 잡히는 경우를 대비한 강제 리사이즈
   requestAnimationFrame(() => {
     if (window._chart) window._chart.resize();
-    if (window._optionChart) window._optionChart.resize();
   });
 }
 
