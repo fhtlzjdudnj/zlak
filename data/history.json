@@ -53,32 +53,6 @@
       ]
     },
     {
-      "timestamp": "2026-07-06T22:46:27.920318+09:00",
-      "sales_value": 1090,
-      "stock_value": 19529,
-      "amount_value": 321550000,
-      "options": [
-        {
-          "optionNo": 514748023,
-          "label": "상품",
-          "value": "일상  ver.세트",
-          "saleCnt": 437,
-          "stockCnt": 9798,
-          "price": 295000,
-          "amount": 128915000
-        },
-        {
-          "optionNo": 514748024,
-          "label": "상품",
-          "value": "최애  ver.세트",
-          "saleCnt": 653,
-          "stockCnt": 9731,
-          "price": 295000,
-          "amount": 192635000
-        }
-      ]
-    },
-    {
       "timestamp": "2026-07-06T22:50:30.402521+09:00",
       "sales_value": 1090,
       "stock_value": 19529,
@@ -2016,6 +1990,32 @@
           "stockCnt": 9780,
           "price": 295000,
           "amount": 134225000
+        },
+        {
+          "optionNo": 514748024,
+          "label": "상품",
+          "value": "최애  ver.세트",
+          "saleCnt": 677,
+          "stockCnt": 9707,
+          "price": 295000,
+          "amount": 199715000
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-07-09T23:00:50.455184+09:00",
+      "sales_value": 1134,
+      "stock_value": 19485,
+      "amount_value": 334530000,
+      "options": [
+        {
+          "optionNo": 514748023,
+          "label": "상품",
+          "value": "일상  ver.세트",
+          "saleCnt": 457,
+          "stockCnt": 9778,
+          "price": 295000,
+          "amount": 134815000
         },
         {
           "optionNo": 514748024,
