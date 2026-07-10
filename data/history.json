@@ -2339,6 +2339,32 @@
           "amount": 203255000
         }
       ]
+    },
+    {
+      "timestamp": "2026-07-10T15:00:36.067910+09:00",
+      "sales_value": 1152,
+      "stock_value": 19466,
+      "amount_value": 339840000,
+      "options": [
+        {
+          "optionNo": 514748023,
+          "label": "상품",
+          "value": "일상  ver.세트",
+          "saleCnt": 463,
+          "stockCnt": 9771,
+          "price": 295000,
+          "amount": 136585000
+        },
+        {
+          "optionNo": 514748024,
+          "label": "상품",
+          "value": "최애  ver.세트",
+          "saleCnt": 689,
+          "stockCnt": 9695,
+          "price": 295000,
+          "amount": 203255000
+        }
+      ]
     }
   ]
 }
